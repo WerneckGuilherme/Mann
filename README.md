@@ -1,28 +1,15 @@
 # Mann
 
-Mann is a browser navigation simulation. The frontend requests real driving geometry from the backend, which normalizes a public OSRM response before the existing simulation engine advances along the road coordinates.
+MANN is a browser driving simulator. Users choose arbitrary origin and destination points by map click or explicit backend geocoding search, then the backend obtains full driving geometry from OSRM. A cached route analyzer feeds a deterministic variable-speed engine and a time-based simulation rendered through MapLibre.
 
 ## Development
 
-From `~/projectsinc/mann`:
+Run npm install, npm install --prefix backend, npm install --prefix frontend, then npm run dev.
 
-```bash
-npm install
-npm install --prefix backend
-npm install --prefix frontend
-npm run dev
-```
+The backend listens on port 3001. Vite proxies browser requests under /api to it. /api/route uses OSRM and /api/geocode?q=... uses Nominatim with explicit searches, a descriptive user agent, result limits, and frontend timeout/error handling.
 
-Open `http://localhost:5173` (or the Vite port printed in the terminal). From another computer on the LAN, use `http://<server-lan-ip>:5173`.
+## Validation
 
-The backend listens on port `3001` and can be configured with `PORT`, `HOST`, and `OSRM_BASE_URL`. The frontend's `/api` requests are proxied to it by Vite, so no server IP is embedded in browser code.
+Run npm run build.
 
-## Production-style validation
-
-```bash
-npm run build
-npm run start:backend
-npm --prefix frontend run preview -- --host 0.0.0.0
-```
-
-A direct health check is available at `http://localhost:3001/health`.
+The simulation is deterministic from elapsed time, so hidden-tab rendering gaps are reconciled when a frame returns. Manual pause remains a hard freeze. AI driving behavior, traffic, weather, and authoritative OSM speed-limit metadata remain future work.

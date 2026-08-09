@@ -1,9 +1,5 @@
-import { kilometersPerHourToMetersPerSecond } from '../utils/speed.ts';
-export type SimulationState = { speedKilometersPerHour: number; distanceTraveled: number; running: boolean; timeMultiplier: number };
-export function createSimulation(speedKilometersPerHour = 80): SimulationState { return { speedKilometersPerHour, distanceTraveled: 0, running: false, timeMultiplier: 1 }; }
-export function advanceSimulation(state: SimulationState, deltaTimeSeconds: number, maxDistanceMeters?: number): SimulationState {
-    if (!state.running || deltaTimeSeconds <= 0) return state;
-    const distance = state.distanceTraveled + kilometersPerHourToMetersPerSecond(state.speedKilometersPerHour) * deltaTimeSeconds * state.timeMultiplier;
-    const nextDistance = maxDistanceMeters === undefined ? distance : Math.min(distance, maxDistanceMeters);
-    return { ...state, distanceTraveled: nextDistance, running: maxDistanceMeters !== undefined && nextDistance >= maxDistanceMeters ? false : state.running };
-}
+import {kilometersPerHourToMetersPerSecond} from '../utils/speed.ts';import {advanceSpeed,createSpeedEngineState,type SpeedDebugInfo,type SpeedEngineState} from './speedEngine.ts';import type {AnalyzedRoute} from './routeAnalyzer.ts';import type {VehicleDefinition} from '../types/vehicle.ts';
+export type SimulationState={speedKilometersPerHour:number;distanceTraveled:number;running:boolean;timeMultiplier:number;simulationElapsedSeconds:number;speedEngine:SpeedEngineState;speedDebug:SpeedDebugInfo|null};
+export const createSimulation=(speed=80):SimulationState=>({speedKilometersPerHour:speed,distanceTraveled:0,running:false,timeMultiplier:1,simulationElapsedSeconds:0,speedEngine:createSpeedEngineState(),speedDebug:null});
+export const getTripAverageKmh=(state:SimulationState)=>state.simulationElapsedSeconds>0?state.distanceTraveled/state.simulationElapsedSeconds*3.6:0;
+export function advanceSimulation(state:SimulationState,delta:number,route?:AnalyzedRoute,vehicle?:VehicleDefinition,maxDistance?:number):SimulationState{if(!state.running||delta<=0||!route||!vehicle)return state;const elapsed=delta*state.timeMultiplier;const speedEngine=advanceSpeed(state.speedEngine,{route,distanceTraveled:state.distanceTraveled,targetAverageKmh:state.speedKilometersPerHour,actualAverageKmh:getTripAverageKmh(state),vehicle,deltaSeconds:elapsed});const next=Math.min(maxDistance??Infinity,state.distanceTraveled+kilometersPerHourToMetersPerSecond(speedEngine.speedKmh)*elapsed);const arrived=maxDistance!==undefined&&next>=maxDistance;const nextState={...state,distanceTraveled:next,running:!arrived,simulationElapsedSeconds:state.simulationElapsedSeconds+elapsed,speedEngine:arrived?{speedKmh:0,debug:speedEngine.debug}:speedEngine,speedDebug:speedEngine.debug};return nextState;}
