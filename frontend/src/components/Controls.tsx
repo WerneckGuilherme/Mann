@@ -1,0 +1,5 @@
+type Props = { running: boolean; canStart: boolean; canRestart: boolean; speed: number; timeMultiplier: number; onRunningChange: (running: boolean) => void; onSpeedChange: (speed: number) => void; onMultiplierChange: (value: number) => void; onRestart: () => void };
+function Controls({ running, canStart, canRestart, speed, timeMultiplier, onRunningChange, onSpeedChange, onMultiplierChange, onRestart }: Props) {
+    return <section className="controls" aria-label="Simulation controls"><button disabled={!canStart} onClick={() => onRunningChange(!running)}>{running ? 'Pause' : 'Start'}</button><button disabled={!canRestart} onClick={onRestart}>Restart</button><label>Speed<select value={speed} onChange={event => onSpeedChange(Number(event.target.value))}>{[60, 80, 100, 120].map(value => <option key={value} value={value}>{value} km/h</option>)}</select></label><label>Rate<select value={timeMultiplier} onChange={event => onMultiplierChange(Number(event.target.value))}>{[1, 5, 10, 50, 100].map(value => <option key={value} value={value}>{value}x</option>)}</select></label></section>;
+}
+export default Controls;
