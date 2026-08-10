@@ -13,3 +13,7 @@ The backend listens on port 3001. Vite proxies browser requests under /api to it
 Run npm run build.
 
 The simulation is deterministic from elapsed time, so hidden-tab rendering gaps are reconciled when a frame returns. Manual pause remains a hard freeze. AI driving behavior, traffic, weather, and authoritative OSM speed-limit metadata remain future work.
+
+## Navigation pass
+
+OSRM driving steps are normalized once into route-distance-indexed maneuvers. The simulator derives current/next guidance, contextual navigation signs, and compact city/highway transition banners from that metadata. Reverse-geocoded administrative samples are requested sequentially with bounded adaptive spacing, cached by the backend/frontend, and enriched without blocking route display. Guidance is simulated from route metadata; the sign card is contextual UI rather than an authoritative physical road-sign reproduction. Voice navigation, lane guidance, and authoritative administrative-boundary data remain future work.

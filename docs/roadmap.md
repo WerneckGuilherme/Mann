@@ -12,3 +12,14 @@
 ## Next
 
 Add OSRM step metadata, authoritative OSM maxspeed/road classes, traffic/weather, persistence, and optional driver behavior. AI-based driving behavior is planned but is not required by this beta.
+
+## Navigation simulator pass completed
+
+- Normalized OSRM maneuver metadata and centralized human-readable instructions
+- Route-distance next-maneuver guidance with distance formatting and simple directional icons
+- Contextual highway/urban navigation sign card
+- Confirmed city, region, country, and major-road transition banners
+- Bounded sequential adaptive administrative enrichment with cancellation and cache reuse
+- Context-sensitive suppression of short connector/ramp road-name noise
+
+Voice navigation, lane-level guidance, authoritative OSM speed limits, traffic/weather, and persistent trips remain future work.
