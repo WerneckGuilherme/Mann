@@ -1,5 +1,23 @@
-import type {IncomingMessage,ServerResponse} from 'node:http';import {fetchDrivingRoute} from '../services/osrm.service.js';
-type RouteRequest={startLon:number;startLat:number;endLon:number;endLat:number};function parseCoordinate(value:string|undefined,name:string){const parsed=Number(value);if(!value||!Number.isFinite(parsed))throw new Error(name+' must be a finite number.');return parsed;}
-function parseRouteRequest(url:URL):RouteRequest{const request={startLon:parseCoordinate(url.searchParams.get('startLon')??undefined,'startLon'),startLat:parseCoordinate(url.searchParams.get('startLat')??undefined,'startLat'),endLon:parseCoordinate(url.searchParams.get('endLon')??undefined,'endLon'),endLat:parseCoordinate(url.searchParams.get('endLat')??undefined,'endLat')};for(const[name,value]of Object.entries(request)){const valid=name.endsWith('Lon')?value>=-180&&value<=180:value>=-90&&value<=90;if(!valid)throw new Error(name+' is outside its valid geographic range.');}if(request.startLon===request.endLon&&request.startLat===request.endLat)throw new Error('Origin and destination must be different.');return request;}
-function sendJson(response:ServerResponse,status:number,body:unknown){const payload=JSON.stringify(body);response.writeHead(status,{'content-type':'application/json; charset=utf-8','content-length':Buffer.byteLength(payload)});response.end(payload);}
-export async function handleRoutingRequest(request:IncomingMessage,response:ServerResponse,url:URL){if(request.method!=='GET'||url.pathname!=='/api/route'){sendJson(response,404,{error:'Route endpoint not found.'});return;}try{const coordinates=parseRouteRequest(url);sendJson(response,200,await fetchDrivingRoute(coordinates.startLon,coordinates.startLat,coordinates.endLon,coordinates.endLat));}catch(error){const message=error instanceof Error?error.message:'Unable to calculate route.';sendJson(response,message.includes('timed out')||message.includes('reach OSRM')?504:400,{error:message});}}
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { fetchDrivingRoute, RoutingError } from '../services/osrm.service.js';
+
+type RouteRequest = { startLon: number; startLat: number; endLon: number; endLat: number };
+function parseCoordinate(value: string | undefined, name: string) { const parsed = Number(value); if (!value || !Number.isFinite(parsed)) throw new Error(name + ' must be a finite number.'); return parsed; }
+function parseRouteRequest(url: URL): RouteRequest {
+  const request = { startLon: parseCoordinate(url.searchParams.get('startLon') ?? undefined, 'startLon'), startLat: parseCoordinate(url.searchParams.get('startLat') ?? undefined, 'startLat'), endLon: parseCoordinate(url.searchParams.get('endLon') ?? undefined, 'endLon'), endLat: parseCoordinate(url.searchParams.get('endLat') ?? undefined, 'endLat') };
+  for (const [name, value] of Object.entries(request)) { const valid = name.endsWith('Lon') ? value >= -180 && value <= 180 : value >= -90 && value <= 90; if (!valid) throw new Error(name + ' is outside its valid geographic range.'); }
+  if (request.startLon === request.endLon && request.startLat === request.endLat) throw new Error('Origin and destination must be different.');
+  return request;
+}
+function sendJson(response: ServerResponse, status: number, body: unknown) { const payload = JSON.stringify(body); response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(payload) }); response.end(payload); }
+function statusFor(code: string) { if (code === 'NO_ROUTE') return 422; if (code === 'UPSTREAM_TIMEOUT' || code === 'BACKEND_TIMEOUT') return 504; if (code === 'NETWORK_ERROR' || code === 'UPSTREAM_HTTP_ERROR' || code === 'INVALID_ROUTE_RESPONSE') return 502; return 400; }
+
+export async function handleRoutingRequest(request: IncomingMessage, response: ServerResponse, url: URL) {
+  if (request.method !== 'GET' || url.pathname !== '/api/route') { sendJson(response, 404, { error: 'Route endpoint not found.', code: 'NOT_FOUND' }); return; }
+  try { const coordinates = parseRouteRequest(url); sendJson(response, 200, await fetchDrivingRoute(coordinates.startLon, coordinates.startLat, coordinates.endLon, coordinates.endLat)); }
+  catch (error) {
+    const code = error instanceof RoutingError ? error.code : 'INVALID_REQUEST';
+    const message = error instanceof Error ? error.message : 'Unable to calculate route.';
+    sendJson(response, statusFor(code), { error: message, code });
+  }
+}

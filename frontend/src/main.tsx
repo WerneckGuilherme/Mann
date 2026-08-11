@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
-import App from './App.tsx';
+import App from './App.tsx';import {LanguageProvider} from './i18n/LanguageContext.tsx';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './styles/app.css';
 
@@ -13,6 +13,6 @@ if (!rootElement) {
 
 ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
-        <App />
+        <LanguageProvider><App /></LanguageProvider>
     </React.StrictMode>,
 );

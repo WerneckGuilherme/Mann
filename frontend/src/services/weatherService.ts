@@ -1,0 +1,3 @@
+import type {Coordinate} from '../types/route.ts';import type {LiveWeather} from '../types/weather.ts';
+export const WEATHER_REFRESH_DISTANCE_METERS=15000;export const WEATHER_REFRESH_INTERVAL_MS=10*60*1000;
+export async function fetchWeather(position:Coordinate,signal?:AbortSignal):Promise<LiveWeather>{const params=new URLSearchParams({lat:String(position.latitude),lon:String(position.longitude)});const response=await fetch('/api/weather?'+params,{signal});let body:{weather?:LiveWeather;error?:string};try{body=await response.json();}catch{throw new Error('Weather service returned invalid JSON.');}if(!response.ok||!body.weather)throw new Error(body.error||'Unable to load live weather.');return body.weather;}

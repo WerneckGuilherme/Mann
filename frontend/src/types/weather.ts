@@ -1,0 +1,2 @@
+export type WeatherCondition='clear'|'cloudy'|'rain'|'storm'|'fog'|'snow';
+export interface LiveWeather{latitude:number;longitude:number;observedAt:string;temperatureC:number;apparentTemperatureC:number;humidityPercent:number;precipitationMm:number;rainMm:number;showersMm:number;cloudCoverPercent:number;windSpeedKmh:number;windDirectionDegrees:number;windGustKmh:number;visibilityMeters:number;weatherCode:number;condition:WeatherCondition;isDay:boolean;}

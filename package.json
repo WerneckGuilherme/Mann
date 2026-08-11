@@ -4,11 +4,9 @@
   "private": true,
   "scripts": {
     "build": "npm --prefix backend run build && npm --prefix frontend run build",
-    "dev": "concurrently -k \"npm --prefix backend run dev\" \"npm --prefix frontend run dev -- --host 0.0.0.0\"",
+    "dev": "concurrently --names backend,frontend \"npm --prefix backend run dev\" \"npm --prefix frontend run dev -- --host 0.0.0.0\"",
     "preview": "npm --prefix frontend run preview -- --host 0.0.0.0",
     "start:backend": "npm --prefix backend run start"
   },
-  "devDependencies": {
-    "concurrently": "^9.1.2"
-  }
+  "devDependencies": { "concurrently": "^9.1.2" }
 }

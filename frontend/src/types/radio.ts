@@ -1,0 +1,1 @@
+export interface RadioStation{id:string;name:string;streamUrl:string;homepage?:string;favicon?:string;countryCode?:string;state?:string;language?:string;codec?:string;bitrateKbps?:number;latitude?:number;longitude?:number;distanceKm?:number;tags:string[];votes?:number;}
