@@ -2,7 +2,7 @@ import type { AdministrativeLocation, Coordinate, GeocodingResult, LocationSampl
 import { getRouteProgress } from '../game/routeProgress.ts';
 
 type RawIntersection = { location?: [number, number]; bearings?: number[] };
-type RouteResponse = { coordinates: Array<[number, number]>; distanceMeters: number; durationSeconds: number; navigationSegments?: Route['navigationSegments']; maneuvers?: Array<Omit<NavigationManeuver, 'position' | 'intersections'> & { position?: [number, number]; intersections?: RawIntersection[] }> };
+type RouteResponse = { coordinates: Array<[number, number]>; distanceMeters: number; durationSeconds: number; profileSpeedsKmh?: Array<number|null>; navigationSegments?: Route['navigationSegments']; maneuvers?: Array<Omit<NavigationManeuver, 'position' | 'intersections'> & { position?: [number, number]; intersections?: RawIntersection[] }> };
 export type RouteRequestErrorCode = 'BACKEND_UNAVAILABLE' | 'UPSTREAM_TIMEOUT' | 'BACKEND_TIMEOUT' | 'UPSTREAM_HTTP_ERROR' | 'NO_ROUTE' | 'NETWORK_ERROR' | 'REQUEST_ABORTED' | 'FRONTEND_TIMEOUT' | 'HTTP_ERROR' | 'INVALID_JSON' | 'INVALID_ROUTE' | 'INVALID_COORDINATES';
 export class RouteRequestError extends Error { constructor(public readonly code: RouteRequestErrorCode, message: string) { super(message); this.name = 'RouteRequestError'; } }
 export const ROUTE_FRONTEND_TIMEOUT_MS = 30_000;
@@ -41,7 +41,8 @@ export async function requestRoute(origin: Coordinate, destination: Coordinate, 
   const body = await jsonRequest('/api/route?' + p, signal, ROUTE_FRONTEND_TIMEOUT_MS) as RouteResponse;
   if (!Array.isArray(body.coordinates) || body.coordinates.length < 2 || !body.coordinates.every(item => Array.isArray(item) && item.length >= 2 && item.every(value => typeof value === 'number' && Number.isFinite(value)))) throw new RouteRequestError('INVALID_ROUTE', 'The route service returned invalid road geometry.');
   if (typeof body.distanceMeters !== 'number' || typeof body.durationSeconds !== 'number') throw new RouteRequestError('INVALID_ROUTE', 'The route service returned incomplete route metadata.');
-  return { coordinates: body.coordinates.map(([longitude, latitude]) => ({ latitude, longitude })), distanceMeters: body.distanceMeters, durationSeconds: body.durationSeconds, navigationSegments: body.navigationSegments ?? [], maneuvers: (body.maneuvers ?? []).map(m => { const { position, intersections, ...rest } = m; return { ...rest, ...(point(position) ? { position: point(position) } : {}), ...(normalizeIntersections(intersections) ? { intersections: normalizeIntersections(intersections) } : {}) }; }) };
+  const profileSpeedsKmh = Array.isArray(body.profileSpeedsKmh) && body.profileSpeedsKmh.length === body.coordinates.length - 1 && body.profileSpeedsKmh.every(value => value === null || typeof value === 'number' && Number.isFinite(value) && value > 0) ? body.profileSpeedsKmh : undefined;
+  return { coordinates: body.coordinates.map(([longitude, latitude]) => ({ latitude, longitude })), distanceMeters: body.distanceMeters, durationSeconds: body.durationSeconds, ...(profileSpeedsKmh ? { profileSpeedsKmh } : {}), navigationSegments: body.navigationSegments ?? [], maneuvers: (body.maneuvers ?? []).map(m => { const { position, intersections, ...rest } = m; return { ...rest, ...(point(position) ? { position: point(position) } : {}), ...(normalizeIntersections(intersections) ? { intersections: normalizeIntersections(intersections) } : {}) }; }) };
 }
 
 const locationCache = new Map<string, AdministrativeLocation | null>();

@@ -1,7 +1,7 @@
 export type OsrmCoordinate = [number, number];
 export type MannManeuver = { routeDistanceMeters: number; distanceFromPreviousMeters: number; type: string; modifier?: string; roadName?: string; roadRef?: string; position?: OsrmCoordinate; exit?: number; destination?: string; intersections?: Array<{ location?: OsrmCoordinate; bearings?: number[] }> };
-export type MannNavigationSegment = { startDistanceMeters: number; endDistanceMeters: number; roadName?: string; roadRef?: string; position?: OsrmCoordinate };
-export type MannRoute = { coordinates: OsrmCoordinate[]; distanceMeters: number; durationSeconds: number; maneuvers: MannManeuver[]; navigationSegments: MannNavigationSegment[] };
+export type MannNavigationSegment = { startDistanceMeters: number; endDistanceMeters: number; roadName?: string; roadRef?: string; mode?: string; position?: OsrmCoordinate };
+export type MannRoute = { coordinates: OsrmCoordinate[]; distanceMeters: number; durationSeconds: number; profileSpeedsKmh?: Array<number | null>; maneuvers: MannManeuver[]; navigationSegments: MannNavigationSegment[] };
 export type RoutingErrorCode = 'UPSTREAM_TIMEOUT' | 'BACKEND_TIMEOUT' | 'UPSTREAM_HTTP_ERROR' | 'NO_ROUTE' | 'INVALID_ROUTE_RESPONSE' | 'NETWORK_ERROR';
 
 export class RoutingError extends Error {
@@ -13,8 +13,8 @@ export const ROUTE_BACKEND_TIMEOUT_MS = 20_000;
 export const ROUTE_MAX_ATTEMPTS = 2;
 const ROUTE_CACHE_TTL_MS = 10 * 60 * 1_000;
 const DEFAULT_OSRM_BASE_URL = 'https://router.project-osrm.org';
-type OsrmStep = { distance?: number; name?: string; ref?: string; destinations?: string; maneuver?: { location?: unknown; type?: unknown; modifier?: unknown; exit?: unknown }; intersections?: Array<{ location?: unknown; bearings?: unknown }> };
-type OsrmResponse = { code?: string; message?: string; routes?: Array<{ distance?: number; duration?: number; geometry?: { coordinates?: unknown }; legs?: Array<{ steps?: OsrmStep[] }> }> };
+type OsrmStep = { distance?: number; name?: string; ref?: string; mode?: string; destinations?: string; maneuver?: { location?: unknown; type?: unknown; modifier?: unknown; exit?: unknown }; intersections?: Array<{ location?: unknown; bearings?: unknown }> };
+type OsrmResponse = { code?: string; message?: string; routes?: Array<{ distance?: number; duration?: number; geometry?: { coordinates?: unknown }; legs?: Array<{ steps?: OsrmStep[]; annotation?: { speed?: unknown } }> }> };
 type CacheEntry = { expiresAt: number; route: MannRoute };
 const routeCache = new Map<string, CacheEntry>();
 const inFlight = new Map<string, Promise<MannRoute>>();
@@ -26,7 +26,7 @@ function routeKey(values: number[]) { return values.map(value => value.toFixed(5
 function isAbortError(error: unknown) { return error instanceof DOMException && error.name === 'AbortError'; }
 
 async function requestProvider(baseUrl: string, startLon: number, startLat: number, endLon: number, endLat: number, timeoutMs: number): Promise<MannRoute> {
-  const url = `${baseUrl}/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson&steps=true`;
+  const url = `${baseUrl}/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson&steps=true&annotations=speed`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   let response: Response;
@@ -45,19 +45,24 @@ async function requestProvider(baseUrl: string, startLon: number, startLat: numb
   if (payload.code !== 'Ok' || !route || typeof route.distance !== 'number' || typeof route.duration !== 'number' || !Array.isArray(coordinates)) throw new RoutingError('INVALID_ROUTE_RESPONSE', payload.message || 'The routing provider did not return a usable route.', true);
   const normalizedCoordinates = coordinates.filter(isCoordinate);
   if (normalizedCoordinates.length < 2) throw new RoutingError('INVALID_ROUTE_RESPONSE', 'The routing provider returned a route without enough road coordinates.', true);
+  if (normalizedCoordinates.length !== coordinates.length) throw new RoutingError('INVALID_ROUTE_RESPONSE', 'The routing provider returned invalid road coordinates.', true);
+  const annotatedSpeeds = route.legs?.[0]?.annotation?.speed;
+  const profileSpeedsKmh = Array.isArray(annotatedSpeeds) && annotatedSpeeds.length === normalizedCoordinates.length - 1
+    ? annotatedSpeeds.map((speed: unknown) => typeof speed === 'number' && Number.isFinite(speed) && speed > 0 ? Math.round(speed * 36) / 10 : null)
+    : undefined;
   let distance = 0;
   const navigationSegments: MannNavigationSegment[] = [];
   const maneuvers: MannManeuver[] = [];
   for (const leg of route.legs ?? []) for (const step of leg.steps ?? []) {
-    const stepDistance = typeof step.distance === 'number' && Number.isFinite(step.distance) ? step.distance : 0;
-    const name = optionalString(step.name); const ref = optionalString(step.ref); const location = isCoordinate(step.maneuver?.location) ? step.maneuver.location : undefined;
+    const stepDistance = typeof step.distance === 'number' && Number.isFinite(step.distance) ? Math.max(0, step.distance) : 0;
+    const name = optionalString(step.name); const ref = optionalString(step.ref); const mode = optionalString(step.mode); const location = isCoordinate(step.maneuver?.location) ? step.maneuver.location : undefined;
     const type = optionalString(step.maneuver?.type) ?? 'continue'; const modifier = optionalString(step.maneuver?.modifier); const exit = typeof step.maneuver?.exit === 'number' && Number.isFinite(step.maneuver.exit) ? step.maneuver.exit : undefined; const destination = optionalString(step.destinations);
-    const intersections = step.intersections?.flatMap(intersection => { const intersectionLocation = isCoordinate(intersection.location) ? intersection.location : undefined; return intersectionLocation ? [{ location: intersectionLocation }] : []; });
+    const intersections = step.intersections?.flatMap(intersection => { const intersectionLocation = isCoordinate(intersection.location) ? intersection.location : undefined; const bearings = Array.isArray(intersection.bearings) ? intersection.bearings.filter((value): value is number => typeof value === 'number' && Number.isFinite(value)) : []; return intersectionLocation ? [{ location: intersectionLocation, ...(bearings.length ? { bearings } : {}) }] : []; });
     maneuvers.push({ routeDistanceMeters: distance, distanceFromPreviousMeters: stepDistance, type, ...(modifier ? { modifier } : {}), ...(name ? { roadName: name } : {}), ...(ref ? { roadRef: ref } : {}), ...(location ? { position: location } : {}), ...(exit !== undefined ? { exit } : {}), ...(destination ? { destination } : {}), ...(intersections?.length ? { intersections } : {}) });
-    if (name || ref) navigationSegments.push({ startDistanceMeters: distance, endDistanceMeters: distance + stepDistance, ...(name ? { roadName: name } : {}), ...(ref ? { roadRef: ref } : {}), ...(location ? { position: location } : {}) });
+    if (name || ref || mode) navigationSegments.push({ startDistanceMeters: distance, endDistanceMeters: distance + stepDistance, ...(name ? { roadName: name } : {}), ...(ref ? { roadRef: ref } : {}), ...(mode ? { mode } : {}), ...(location ? { position: location } : {}) });
     distance += stepDistance;
   }
-  return { coordinates: normalizedCoordinates, distanceMeters: route.distance, durationSeconds: route.duration, maneuvers, navigationSegments };
+  return { coordinates: normalizedCoordinates, distanceMeters: route.distance, durationSeconds: route.duration, ...(profileSpeedsKmh ? { profileSpeedsKmh } : {}), maneuvers, navigationSegments };
 }
 
 async function fetchWithResilience(startLon: number, startLat: number, endLon: number, endLat: number): Promise<MannRoute> {

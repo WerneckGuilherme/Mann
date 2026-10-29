@@ -3,6 +3,7 @@ import { handleRoutingRequest } from './routes/routing.routes.js';
 import { handleGeocodingRequest } from './routes/geocoding.routes.js';
 import { handleWeatherRequest } from './routes/weather.routes.js';
 import { handleRadioRequest } from './routes/radio.routes.js';
+import { handleRoadsRequest } from './routes/roads.routes.js';
 
 const port = Number(process.env.PORT ?? 3001);
 const host = process.env.HOST ?? '0.0.0.0';
@@ -20,6 +21,7 @@ const server = createServer(async (request, response) => {
   if (await handleGeocodingRequest(request, response, url)) return;
   if (await handleWeatherRequest(request, response, url)) return;
   if (await handleRadioRequest(request, response, url)) return;
+  if (await handleRoadsRequest(request, response, url)) return;
   await handleRoutingRequest(request, response, url);
 });
 server.listen(port, host, () => {

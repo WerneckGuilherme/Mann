@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "test": "backend/node_modules/.bin/tsx --test tests/*.test.ts",
     "build": "npm --prefix backend run build && npm --prefix frontend run build",
     "dev": "concurrently --names backend,frontend \"npm --prefix backend run dev\" \"npm --prefix frontend run dev -- --host 0.0.0.0\"",
     "preview": "npm --prefix frontend run preview -- --host 0.0.0.0",
